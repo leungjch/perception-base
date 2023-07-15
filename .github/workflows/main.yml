@@ -26,4 +26,4 @@ jobs:
       with:
         context: .
         push: true
-        tags: your-dockerhub-username/your-repository-name:latest  # Replace with your DockerHub username and Docker image name
+        tags: leungjch/perception-base:latest  # Replace with your DockerHub username and Docker image name
