@@ -57,8 +57,8 @@ RUN python3 -m pip install -U \
    rosinstall-generator
 
 # Get ROS2 Code
-RUN mkdir -p /ros2_humble/${ROS_DISTRO}/src
-WORKDIR /ros2_humble/${ROS_DISTRO}
+RUN mkdir -p /opt/ros/${ROS_DISTRO}/src
+WORKDIR /opt/ros/${ROS_DISTRO}
 
 # Generate the base repos to get a minimal ROS2 install
 RUN rosinstall_generator ros_base --format repos --rosdistro humble --deps > base.repos
@@ -74,6 +74,9 @@ RUN rosdep install --from-paths src --ignore-src -y --skip-keys "fastcdr rti-con
 # Build ROS2 humble
 RUN colcon build --symlink-install
 RUN . install/setup.bash
+
+# Alias setup.bash for consistency with pre-built binary installations of ROS2
+RUN echo "source /opt/ros/${ROS_DISTRO}/install/setup.bash ; export ROS_DISTRO=${ROS_DISTRO}" > /opt/ros/${ROS_DISTRO}/setup.bash
 
 #### End of ROS2 install
 
