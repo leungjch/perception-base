@@ -51,12 +51,17 @@ RUN python3 -m pip install -U \
    flake8-quotes \
    "pytest>=5.3" \
    pytest-repeat \
-   pytest-rerunfailures
+   pytest-rerunfailures \
+   rosinstall-generator
 
 # Get ROS2 Code
 RUN mkdir -p /ros2_humble/src
 WORKDIR /ros2_humble 
-RUN vcs import --input https://raw.githubusercontent.com/ros2/ros2/humble/ros2.repos src
+
+# Generate the base repos to get a minimal ROS2 install
+RUN rosinstall_generator ros_base --format repos --rosdistro humble --deps > base.repos
+
+RUN vcs import --input base.repos src
 
 RUN apt upgrade -y
 
