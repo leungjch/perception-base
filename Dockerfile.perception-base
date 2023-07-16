@@ -5,6 +5,8 @@ ARG ROS_DISTRO=humble
 
 FROM nvidia/cuda:${CUDA_VERSION}-devel-${BASE_DIST} as perception-base
 
+##### Install ROS2
+
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 ENV ROS_DISTRO=humble
@@ -55,8 +57,8 @@ RUN python3 -m pip install -U \
    rosinstall-generator
 
 # Get ROS2 Code
-RUN mkdir -p /ros2_humble/src
-WORKDIR /ros2_humble 
+RUN mkdir -p /opt/ros/${ROS_DISTRO}/src
+WORKDIR /opt/ros/${ROS_DISTRO}
 
 # Generate the base repos to get a minimal ROS2 install
 RUN rosinstall_generator ros_base --format repos --rosdistro humble --deps > base.repos
@@ -71,8 +73,9 @@ RUN rosdep install --from-paths src --ignore-src -y --skip-keys "fastcdr rti-con
 
 # Build ROS2 humble
 RUN colcon build --symlink-install
+RUN . install/setup.bash
 
-#####################
+#### End of ROS2 install
 
 RUN mkdir -p ~/ament_ws/src
 WORKDIR /home/docker/ament_ws/src
