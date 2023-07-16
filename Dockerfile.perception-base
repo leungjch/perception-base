@@ -74,6 +74,7 @@ RUN rosdep install --from-paths src --ignore-src -y --skip-keys "fastcdr rti-con
 # Build ROS2 humble
 RUN colcon build --symlink-install
 RUN . install/setup.bash
+RUN rm -Rf src build log
 
 # Alias setup.bash for consistency with pre-built binary installations of ROS2
 RUN echo "source /opt/ros/${ROS_DISTRO}/install/setup.bash ; export ROS_DISTRO=${ROS_DISTRO}" > /opt/ros/${ROS_DISTRO}/setup.bash
