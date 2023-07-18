@@ -74,12 +74,17 @@ RUN rosdep install --from-paths src --ignore-src -y --skip-keys "fastcdr rti-con
 # Build ROS2 humble
 RUN colcon build --symlink-install
 RUN . install/setup.bash
-RUN rm -Rf src build log
 
 # Alias setup.bash for consistency with pre-built binary installations of ROS2
 RUN echo "source /opt/ros/${ROS_DISTRO}/install/setup.bash ; export ROS_DISTRO=${ROS_DISTRO}" > /opt/ros/${ROS_DISTRO}/setup.bash
 
 #### End of ROS2 install
+
+#### Install TensorRT
+RUN apt-get install -y tensorrt
+
+
+#### Setup rest of the environment
 
 RUN mkdir -p ~/ament_ws/src
 WORKDIR /home/docker/ament_ws/src
@@ -103,5 +108,27 @@ USER docker:docker
 
 RUN sudo chsh -s /bin/bash
 ENV SHELL=/bin/bash
+# setup entrypoint
+COPY scripts/ros_entrypoint.sh /ros_entrypoint.sh
+COPY scripts/variables.sh /variables.sh
 
-ENTRYPOINT ["/bin/bash"]
+RUN sudo sed -i \
+    's/ros_env_setup="\/opt\/ros\/$ROS_DISTRO\/setup.bash"/ros_env_setup="${ROS_ROOT}\/install\/setup.bash"/g' \
+    /ros_entrypoint.sh && \
+    cat /ros_entrypoint.sh
+
+# Set permissions
+RUN sudo chmod +x /ros_entrypoint.sh
+RUN sudo chmod -R 777 /home/docker
+RUN sudo chmod -R 777 /opt/ros
+
+# Delete default sources list file
+RUN sudo rm /etc/ros/rosdep/sources.list.d/20-default.list
+
+# Set shell
+SHELL ["/bin/bash", "-ec"]
+
+
+WORKDIR /
+ENTRYPOINT ["/ros_entrypoint.sh"]
+CMD ["bash"]
