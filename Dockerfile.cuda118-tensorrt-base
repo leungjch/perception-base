@@ -1,0 +1,139 @@
+
+FROM nvcr.io/nvidia/tensorrt:22.12-py3
+ARG BASE_DIST=ubuntu20.04
+ARG OPENCV_VERSION=4.5.0
+ARG ROS_DISTRO=humble
+
+
+##### Install ROS2
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV ROS_DISTRO=humble
+
+# Install necessary tools
+RUN apt-get update && apt-get install -y \
+    locales \
+    apt-utils \
+    curl \
+    gnupg2 \
+    lsb-release 
+
+# Set the locale to use UTF-8
+RUN locale-gen en_US en_US.UTF-8
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
+
+RUN apt install -y software-properties-common
+RUN add-apt-repository universe
+
+# Add the ROS2 apt repository
+RUN curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | apt-key add -
+RUN echo "deb [arch=$(dpkg --print-architecture)] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/ros2-latest.list
+
+# Update the package list
+RUN apt-get update 
+
+# Install ROS2 dev tools 
+RUN apt update && apt install -y \
+  python3-flake8-docstrings \
+  python3-pip \
+  python3-pytest-cov \
+  ros-dev-tools
+
+# Install packages
+RUN python3 -m pip install -U \
+   flake8-blind-except \
+   flake8-builtins \
+   flake8-class-newline \
+   flake8-comprehensions \
+   flake8-deprecated \
+   flake8-import-order \
+   flake8-quotes \
+   "pytest>=5.3" \
+   pytest-repeat \
+   pytest-rerunfailures \
+   rosinstall-generator
+
+# Get ROS2 Code
+RUN mkdir -p /opt/ros/${ROS_DISTRO}/src
+WORKDIR /opt/ros/${ROS_DISTRO}
+
+## Generate the base repos to get a minimal ROS2 install
+# RUN rosinstall_generator ros_base --format repos --rosdistro humble --deps > base.repos
+## Note: we use a custom base.repos in the root of this directory
+COPY base.repos base.repos
+RUN vcs import --input base.repos src
+
+RUN apt upgrade -y
+
+RUN rosdep init
+RUN rosdep update
+RUN rosdep install --from-paths src --ignore-src -y --skip-keys "fastcdr rti-connext-dds-6.0.1 urdfdom_headers"
+
+# Build ROS2 humble
+RUN colcon build --symlink-install
+RUN . install/setup.bash
+
+# Alias setup.bash for consistency with pre-built binary installations of ROS2
+RUN echo "source /opt/ros/${ROS_DISTRO}/install/setup.bash ; export ROS_DISTRO=${ROS_DISTRO}" > /opt/ros/${ROS_DISTRO}/setup.bash
+
+#### End of ROS2 install
+
+## Needed for BEVFusion
+RUN apt install -y libprotobuf-dev
+RUN pip install onnx
+
+
+#### Setup rest of the environment
+
+RUN mkdir -p ~/ament_ws/src
+WORKDIR /home/docker/ament_ws/src
+
+# Add a docker user so we that created files in the docker container are owned by a non-root user
+RUN addgroup --gid 1000 docker && \
+    adduser --uid 1000 --ingroup docker --home /home/docker --shell /bin/bash --disabled-password --gecos "" docker && \
+    echo "docker ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/nopasswd
+
+# Remap the docker user and group to be the same uid and group as the host user.
+# Any created files by the docker container will be owned by the host user.
+RUN USER=docker && \
+    GROUP=docker && \                                                                     
+    curl -SsL https://github.com/boxboat/fixuid/releases/download/v0.4/fixuid-0.4-linux-amd64.tar.gz | tar -C /usr/local/bin -xzf - && \                                                                                                            
+    chown root:root /usr/local/bin/fixuid && \                                                                              
+    chmod 4755 /usr/local/bin/fixuid && \
+    mkdir -p /etc/fixuid && \                                                                                               
+    printf "user: $USER\ngroup: $GROUP\npaths:\n  - /home/docker/" > /etc/fixuid/config.yml
+
+USER docker:docker
+
+RUN sudo chsh -s /bin/bash
+ENV SHELL=/bin/bash
+# setup entrypoint
+COPY scripts/ros_entrypoint.sh /ros_entrypoint.sh
+COPY scripts/variables.sh /variables.sh
+
+RUN sudo sed -i \
+    's/ros_env_setup="\/opt\/ros\/$ROS_DISTRO\/setup.bash"/ros_env_setup="${ROS_ROOT}\/install\/setup.bash"/g' \
+    /ros_entrypoint.sh && \
+    cat /ros_entrypoint.sh
+
+# Set permissions
+RUN sudo chmod +x /ros_entrypoint.sh
+RUN sudo chmod -R 777 /home/docker
+RUN sudo chmod -R 777 /opt/ros
+
+# Delete default sources list file
+RUN sudo rm /etc/ros/rosdep/sources.list.d/20-default.list
+
+# Hacky one-liner to fix pluginlib not having maintainer and license which throws error
+RUN find /opt/ros/humble/build/pluginlib  -type f -exec sed -i 's|<name>test_pluginlib</name>|<name>test_pluginlib</name>\n  <maintainer email="maintainer@gmail.com">Maintainer</maintainer>\n  <license>TODO license</license>|g' {} \;
+
+# Set shell
+SHELL ["/bin/bash", "-ec"]
+
+
+WORKDIR /
+ENTRYPOINT ["/ros_entrypoint.sh"]
+CMD ["bash"]
