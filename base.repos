@@ -847,3 +847,7 @@ repositories:
     type: git
     url: https://github.com/ros-perception/pcl_msgs.git
     version: ros2
+  image_common:
+    type: git
+    url: https://github.com/ros-perception/image_common.git
+    version: ros2

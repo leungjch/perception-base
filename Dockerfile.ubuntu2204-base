@@ -8,8 +8,9 @@ FROM ubuntu:22.04 as base
 ENV DEBIAN_FRONTEND=noninteractive
 ENV ROS_DISTRO=humble
 
+
 # Install necessary tools
-RUN apt-get update && apt-get install -y \
+RUN apt-get -y update && apt-get install -y \
     locales \
     apt-utils \
     curl \
@@ -35,8 +36,12 @@ RUN apt update -y && apt upgrade -y && \
     apt install -y \
     ros-humble-ros-base \
     ros-dev-tools \ 
-    ros-humble-pcl-ros
+    ros-humble-pcl-ros \ 
+    ros-humble-cv-bridge
 
+# Install OpenCV
+RUN sudo apt install -y libopencv-dev python3-opencv
+RUN export OpenCV_DIR=/usr/lib/x86_64-linux-gnu/cmake/opencv4/OpenCVConfig.cmake
 #### Setup rest of the environment
 
 RUN mkdir -p ~/ament_ws/src
