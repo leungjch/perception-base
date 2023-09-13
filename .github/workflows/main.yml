@@ -25,6 +25,6 @@ jobs:
       uses: docker/build-push-action@v2
       with:
         context: .
-        file: ./Dockerfile.perception-base
+        file: ./Dockerfile.ubuntu2204-base
         push: true
-        tags: leungjch/perception-base:latest  # Replace with your DockerHub username and Docker image name
+        tags: leungjch/ubuntu2204-base:latest  # Replace with your DockerHub username and Docker image name
