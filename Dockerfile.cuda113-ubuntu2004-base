@@ -1,9 +1,9 @@
+
+FROM nvcr.io/nvidia/tensorrt:22.12-py3
 ARG BASE_DIST=ubuntu20.04
-ARG CUDA_VERSION=12.0.1
 ARG OPENCV_VERSION=4.5.0
 ARG ROS_DISTRO=humble
 
-FROM nvidia/cuda:${CUDA_VERSION}-devel-${BASE_DIST} as perception-base
 
 ##### Install ROS2
 
@@ -81,8 +81,9 @@ RUN echo "source /opt/ros/${ROS_DISTRO}/install/setup.bash ; export ROS_DISTRO=$
 
 #### End of ROS2 install
 
-#### Install TensorRT
-RUN apt-get install -y tensorrt
+## Needed for BEVFusion
+RUN apt install -y libprotobuf-dev
+RUN pip install onnx
 
 
 #### Setup rest of the environment
@@ -128,20 +129,6 @@ RUN sudo rm /etc/ros/rosdep/sources.list.d/20-default.list
 
 # Hacky one-liner to fix pluginlib not having maintainer and license which throws error
 RUN find /opt/ros/humble/build/pluginlib  -type f -exec sed -i 's|<name>test_pluginlib</name>|<name>test_pluginlib</name>\n  <maintainer email="maintainer@gmail.com">Maintainer</maintainer>\n  <license>TODO license</license>|g' {} \;
-
-# Install conda
-ENV PATH="/root/miniconda3/bin:${PATH}"
-ARG PATH="/root/miniconda3/bin:${PATH}"
-RUN apt-get update
-
-RUN apt-get install -y wget && rm -rf /var/lib/apt/lists/*
-
-RUN wget \
-    https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
-    && mkdir /root/.conda \
-    && bash Miniconda3-latest-Linux-x86_64.sh -b \
-    && rm -f Miniconda3-latest-Linux-x86_64.sh 
-RUN conda --version
 
 # Set shell
 SHELL ["/bin/bash", "-ec"]
