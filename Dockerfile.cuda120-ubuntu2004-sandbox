@@ -1,0 +1,81 @@
+FROM nvidia/cuda:12.2.0-devel-ubuntu20.04
+
+##### Install ROS2
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV ROS_DISTRO=humble
+
+
+# Install necessary tools
+RUN apt-get -y update && apt-get install -y \
+    locales \
+    apt-utils \
+    curl \
+    gnupg2 \
+    lsb-release \
+    sudo
+
+# Set the locale to use UTF-8
+RUN locale-gen en_US en_US.UTF-8
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
+
+RUN apt install -y software-properties-common
+RUN add-apt-repository universe
+
+RUN sudo apt update && sudo apt install curl -y
+RUN sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+
+RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
+
+RUN apt update -y && apt upgrade -y && \
+    apt install -y \
+    ros-humble-ros-base \
+    ros-dev-tools \ 
+    ros-humble-pcl-ros \ 
+    ros-humble-cv-bridge
+
+# Install OpenCV
+RUN sudo apt install -y libopencv-dev python3-opencv
+RUN export OpenCV_DIR=/usr/lib/x86_64-linux-gnu/cmake/opencv4/OpenCVConfig.cmake
+#### Setup rest of the environment
+
+RUN mkdir -p ~/ament_ws/src
+WORKDIR /home/docker/ament_ws/src
+
+# Add a docker user so we that created files in the docker container are owned by a non-root user
+RUN addgroup --gid 1000 docker && \
+    adduser --uid 1000 --ingroup docker --home /home/docker --shell /bin/bash --disabled-password --gecos "" docker && \
+    echo "docker ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/nopasswd
+
+# Remap the docker user and group to be the same uid and group as the host user.
+# Any created files by the docker container will be owned by the host user.
+RUN USER=docker && \
+    GROUP=docker && \                                                                     
+    curl -SsL https://github.com/boxboat/fixuid/releases/download/v0.4/fixuid-0.4-linux-amd64.tar.gz | tar -C /usr/local/bin -xzf - && \                                                                                                            
+    chown root:root /usr/local/bin/fixuid && \                                                                              
+    chmod 4755 /usr/local/bin/fixuid && \
+    mkdir -p /etc/fixuid && \                                                                                               
+    printf "user: $USER\ngroup: $GROUP\npaths:\n  - /home/docker/" > /etc/fixuid/config.yml
+
+USER docker:docker
+
+RUN sudo chsh -s /bin/bash
+ENV SHELL=/bin/bash
+# setup entrypoint
+COPY scripts/ros_entrypoint.sh /ros_entrypoint.sh
+COPY scripts/variables.sh /variables.sh
+
+# Set permissions
+RUN sudo chmod +x /ros_entrypoint.sh
+RUN sudo chmod -R 777 /home/docker
+RUN sudo chmod -R 777 /opt/ros
+
+# Set shell
+SHELL ["/bin/bash", "-ec"]
+
+WORKDIR /
+ENTRYPOINT ["/ros_entrypoint.sh"]
+CMD ["bash"]

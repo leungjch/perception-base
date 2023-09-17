@@ -853,5 +853,5 @@ repositories:
     version: ros2
   vision_msgs:
     type: git
-    url: https://github.com/ros-perception/vision_msgs
-    version: ros2
+    url: https://github.com/ros2-gbp/vision_msgs-release.git
+    version: release/humble/vision_msgs/4.1.0-1
